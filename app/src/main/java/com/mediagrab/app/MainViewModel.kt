@@ -52,6 +52,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private var parseJob: Job? = null
     private var previewJob: Job? = null
 
+    @JvmName("updateMode")
     fun setMode(m: MediaMode) {
         mode = m
         Prefs.setDefaultMode(m)
