@@ -6,39 +6,26 @@ import android.app.NotificationManager
 import com.mediagrab.app.data.Engine
 import com.mediagrab.app.data.HistoryStore
 import com.mediagrab.app.data.Prefs
-import android.app.Application
-import com.chaquo.python.Python
-import com.chaquo.python.android.AndroidPlatform
-
 
 class App : Application() {
+    companion object {
+        const val CH_WORK = "mediagrab_work"
+        const val CH_DONE = "mediagrab_done"
+    }
+
     override fun onCreate() {
         super.onCreate()
         Prefs.init(this)
         HistoryStore.init(this)
-        createChannels()
         Engine.initAsync(this)
-    }
 
-    private fun createChannels() {
         val nm = getSystemService(NotificationManager::class.java)
         nm.createNotificationChannel(
-            NotificationChannel(CH_PROGRESS, "Progres unduhan", NotificationManager.IMPORTANCE_LOW)
+            NotificationChannel(CH_WORK, "Proses Unduhan", NotificationManager.IMPORTANCE_LOW)
         )
         nm.createNotificationChannel(
-            NotificationChannel(CH_DONE, "Unduhan selesai", NotificationManager.IMPORTANCE_DEFAULT)
+            NotificationChannel(CH_DONE, "Unduhan Selesai", NotificationManager.IMPORTANCE_DEFAULT)
         )
     }
+}
 
-    companion object {
-        const val CH_PROGRESS = "progress"
-        const val CH_DONE = "done"
-    }
-}
-    override fun onCreate() {
-        super.onCreate()
-        if (!Python.isStarted()) {
-            Python.start(AndroidPlatform(this))
-        }
-    }
-}
