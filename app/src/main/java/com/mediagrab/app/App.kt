@@ -9,7 +9,7 @@ import com.mediagrab.app.data.Prefs
 
 class App : Application() {
     companion object {
-        const val CH_WORK = "mediagrab_work"
+        const val CH_PROGRESS = "mediagrab_progress"
         const val CH_DONE = "mediagrab_done"
     }
 
@@ -21,7 +21,7 @@ class App : Application() {
 
         val nm = getSystemService(NotificationManager::class.java)
         nm.createNotificationChannel(
-            NotificationChannel(CH_WORK, "Proses Unduhan", NotificationManager.IMPORTANCE_LOW)
+            NotificationChannel(CH_PROGRESS, "Proses Unduhan", NotificationManager.IMPORTANCE_LOW)
         )
         nm.createNotificationChannel(
             NotificationChannel(CH_DONE, "Unduhan Selesai", NotificationManager.IMPORTANCE_DEFAULT)
