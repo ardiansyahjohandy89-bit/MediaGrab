@@ -38,7 +38,7 @@ import java.io.IOException
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 
-/** Antrian unduhan: menjalankan yt-dlp, melacak progres, lalu menyimpan hasil ke galeri/Musik/Unduhan. */
+/** Antrian unduhan: menjalankan yt-dlp & gallery-dl, melacak progres, lalu menyimpan hasil ke galeri/Musik/Unduhan. */
 object Downloads {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -116,17 +116,26 @@ object Downloads {
             Engine.awaitReady()
             dir.deleteRecursively()
             dir.mkdirs()
-            val req = buildRequest(task, dir)
-            var last = 0L
-            YoutubeDL.getInstance().execute(req, id) { progress, _, line ->
-                val now = SystemClock.elapsedRealtime()
-                if (now - last > 400) {
-                    last = now
-                    update(id) {
-                        it.copy(
-                            progress = if (progress < 0f) 0f else (progress / 100f).coerceIn(0f, 1f),
-                            info = line.trim().take(100)
-                        )
+
+            if (task.mode == MediaMode.IMAGE) {
+                update(id) { it.copy(progress = 0.2f, info = "Mengunduh galeri dengan gallery-dl…") }
+                val ok = Engine.downloadGallery(task.entry.url, dir.absolutePath)
+                if (!ok && dir.listFiles().isNullOrEmpty()) {
+                    throw IllegalStateException("gallery-dl tidak menemukan media pada tautan ini")
+                }
+            } else {
+                val req = buildRequest(task, dir)
+                var last = 0L
+                YoutubeDL.getInstance().execute(req, id) { progress, _, line ->
+                    val now = SystemClock.elapsedRealtime()
+                    if (now - last > 400) {
+                        last = now
+                        update(id) {
+                            it.copy(
+                                progress = if (progress < 0f) 0f else (progress / 100f).coerceIn(0f, 1f),
+                                info = line.trim().take(100)
+                            )
+                        }
                     }
                 }
             }

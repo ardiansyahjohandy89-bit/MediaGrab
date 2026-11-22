@@ -2,6 +2,7 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
+    id("com.chaquo.python")
 }
 
 val youtubedlAndroid = "0.18.1"
@@ -16,6 +17,11 @@ android {
         targetSdk = 34
         versionCode = 1
         versionName = "1.0.0"
+
+        // Wajib untuk Chaquopy (sesuai dengan splits abi di bawah)
+        ndk {
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64")
+        }
     }
 
     // Satu APK per arsitektur (lebih kecil) + satu APK universal.
@@ -58,6 +64,16 @@ android {
         }
         resources {
             excludes += setOf("/META-INF/{AL2.0,LGPL2.1}", "META-INF/DEPENDENCIES")
+        }
+    }
+}
+
+// Konfigurasi Chaquopy untuk menginstal gallery-dl otomatis saat build
+chaquopy {
+    defaultConfig {
+        version = "3.11"
+        pip {
+            install("gallery-dl")
         }
     }
 }

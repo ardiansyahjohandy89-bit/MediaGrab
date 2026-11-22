@@ -6,6 +6,10 @@ import android.app.NotificationManager
 import com.mediagrab.app.data.Engine
 import com.mediagrab.app.data.HistoryStore
 import com.mediagrab.app.data.Prefs
+import android.app.Application
+import com.chaquo.python.Python
+import com.chaquo.python.android.AndroidPlatform
+
 
 class App : Application() {
     override fun onCreate() {
@@ -29,5 +33,13 @@ class App : Application() {
     companion object {
         const val CH_PROGRESS = "progress"
         const val CH_DONE = "done"
+    }
+}
+class App : Application() {
+    override fun onCreate() {
+        super.onCreate()
+        if (!Python.isStarted()) {
+            Python.start(AndroidPlatform(this))
+        }
     }
 }

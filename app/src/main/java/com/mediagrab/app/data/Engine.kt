@@ -1,6 +1,8 @@
 package com.mediagrab.app.data
 
 import android.content.Context
+import com.chaquo.python.Python
+import com.chaquo.python.android.AndroidPlatform
 import com.yausername.ffmpeg.FFmpeg
 import com.yausername.youtubedl_android.YoutubeDL
 import kotlinx.coroutines.CoroutineScope
@@ -10,7 +12,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-/** Inisialisasi dan pemeliharaan engine yt-dlp + ffmpeg yang ikut di dalam APK. */
+/** Inisialisasi dan pemeliharaan engine yt-dlp + ffmpeg + gallery-dl (Chaquopy). */
 object Engine {
     private val ready = MutableStateFlow(false)
     private val failure = MutableStateFlow<String?>(null)
@@ -21,6 +23,9 @@ object Engine {
             try {
                 YoutubeDL.getInstance().init(app)
                 FFmpeg.getInstance().init(app)
+                if (!Python.isStarted()) {
+                    Python.start(AndroidPlatform(app))
+                }
                 ready.value = true
             } catch (e: Throwable) {
                 failure.value = e.message ?: e.javaClass.simpleName
@@ -34,6 +39,15 @@ object Engine {
             failure.value?.let { throw IllegalStateException("Engine gagal dimulai: $it") }
             delay(150)
         }
+    }
+
+    /** Menjalankan gallery-dl via Chaquopy untuk mengunduh gambar/galeri. */
+    suspend fun downloadGallery(url: String, outputDir: String): Boolean = withContext(Dispatchers.IO) {
+        awaitReady()
+        val py = Python.getInstance()
+        val module = py.getModule("grabber")
+        val status = module.callAttr("download_gallery", url, outputDir).toInt()
+        status == 0
     }
 
     suspend fun version(ctx: Context): String = withContext(Dispatchers.IO) {
