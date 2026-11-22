@@ -38,6 +38,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     var url by mutableStateOf("")
     var mode by mutableStateOf(Prefs.defaultMode.value)
+        private set
     var parseState by mutableStateOf<ParseState>(ParseState.Idle)
         private set
     var selected by mutableStateOf<Set<Int>>(emptySet())
