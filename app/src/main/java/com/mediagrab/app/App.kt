@@ -35,7 +35,6 @@ class App : Application() {
         const val CH_DONE = "done"
     }
 }
-class App : Application() {
     override fun onCreate() {
         super.onCreate()
         if (!Python.isStarted()) {
