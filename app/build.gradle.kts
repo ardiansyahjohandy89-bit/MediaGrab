@@ -18,13 +18,11 @@ android {
         versionCode = 1
         versionName = "1.0.0"
 
-        // Wajib untuk Chaquopy (sesuai dengan splits abi di bawah)
         ndk {
             abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64")
         }
     }
 
-    // Satu APK per arsitektur (lebih kecil) + satu APK universal.
     splits {
         abi {
             isEnable = true
@@ -36,9 +34,7 @@ android {
 
     buildTypes {
         release {
-            // Dimatikan: R8 bisa merusak library yt-dlp (refleksi + JSON).
             isMinifyEnabled = false
-            // Ditandatangani dengan kunci debug supaya APK release bisa langsung dipasang.
             signingConfig = signingConfigs.getByName("debug")
         }
     }
@@ -58,7 +54,6 @@ android {
         checkReleaseBuilds = false
     }
     packaging {
-        // Wajib untuk youtubedl-android: binary python/ffmpeg harus diekstrak ke disk.
         jniLibs {
             useLegacyPackaging = true
         }
@@ -68,22 +63,20 @@ android {
     }
 }
 
-// Konfigurasi Chaquopy untuk menginstal gallery-dl otomatis saat build
 chaquopy {
     defaultConfig {
         version = "3.11"
         pip {
             install("gallery-dl")
+            install("curl-cffi")
         }
     }
 }
 
 dependencies {
-    // Engine unduhan (yt-dlp + ffmpeg)
     implementation("io.github.junkfood02.youtubedl-android:library:$youtubedlAndroid")
     implementation("io.github.junkfood02.youtubedl-android:ffmpeg:$youtubedlAndroid")
 
-    // AndroidX + Compose
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.activity:activity-compose:1.9.3")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
@@ -95,13 +88,10 @@ dependencies {
     implementation("androidx.compose.material:material-icons-extended")
     debugImplementation("androidx.compose.ui:ui-tooling")
 
-    // Pemutar (preview + putar hasil unduhan)
     implementation("androidx.media3:media3-exoplayer:1.4.1")
     implementation("androidx.media3:media3-exoplayer-hls:1.4.1")
     implementation("androidx.media3:media3-ui:1.4.1")
 
-    // Gambar
     implementation("io.coil-kt:coil-compose:2.7.0")
-
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
 }

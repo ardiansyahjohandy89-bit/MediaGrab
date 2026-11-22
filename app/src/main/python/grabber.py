@@ -1,7 +1,18 @@
 import gallery_dl
 import json
 
+CHROME_UA = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+    "AppleWebKit/537.36 (KHTML, like Gecko) "
+    "Chrome/131.0.0.0 Safari/537.36"
+)
+
+def apply_impersonate():
+    gallery_dl.config.set(("extractor",), "browser", "chrome")
+    gallery_dl.config.set(("extractor",), "user-agent", CHROME_UA)
+
 def extract_info(url, limit=30):
+    apply_impersonate()
     results = []
     class LimitReached(Exception):
         pass
@@ -28,6 +39,7 @@ def extract_info(url, limit=30):
     return json.dumps(results)
 
 def download_gallery(url, output_dir):
+    apply_impersonate()
     gallery_dl.config.set(("extractor",), "base-directory", output_dir)
     gallery_dl.config.set(("extractor",), "directory", [])
     job = gallery_dl.job.DownloadJob(url)

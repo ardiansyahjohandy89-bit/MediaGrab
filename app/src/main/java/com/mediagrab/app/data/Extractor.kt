@@ -7,8 +7,11 @@ import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 
-/** Membaca info link (judul, thumbnail, isi playlist/album) lewat yt-dlp dan gallery-dl. */
+/** Membaca info link (judul, thumbnail, isi playlist/album) lewat yt-dlp dan gallery-dl dengan browser impersonate. */
 object Extractor {
+
+    const val CHROME_UA =
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
 
     private val IMAGE_EXT = setOf("jpg", "jpeg", "png", "webp", "gif", "heic", "avif")
     private val GALLERY_HINTS = listOf(
@@ -26,6 +29,8 @@ object Extractor {
         addOption("--no-warnings")
         addOption("--ignore-errors")
         addOption("--socket-timeout", "15")
+        addOption("--user-agent", CHROME_UA)
+        addOption("--impersonate", "chrome")
     }
 
     private fun JSONObject.str(key: String): String? {
@@ -124,7 +129,6 @@ object Extractor {
     }
 
     suspend fun parse(url: String): ParsedLink = withContext(Dispatchers.IO) {
-        // Jika domain dikenali sebagai situs galeri, langsung pakai gallery-dl tanpa menunggu yt-dlp
         if (isLikelyGallery(url)) {
             return@withContext parseWithGalleryDl(url)
         }
@@ -142,7 +146,7 @@ object Extractor {
     suspend fun resolveStream(entry: MediaEntry, audioOnly: Boolean): StreamInfo =
         withContext(Dispatchers.IO) {
             if (entry.isImage) {
-                return@withContext StreamInfo(entry.url, emptyMap(), false)
+                return@withContext StreamInfo(entry.url, mapOf("User-Agent" to CHROME_UA), false)
             }
             Engine.awaitReady()
             val req = baseRequest(entry.url).apply {
