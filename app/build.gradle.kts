@@ -68,7 +68,6 @@ chaquopy {
         version = "3.11"
         pip {
             install("gallery-dl")
-            install("curl-cffi")
         }
     }
 }
