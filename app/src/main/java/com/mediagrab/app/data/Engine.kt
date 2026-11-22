@@ -41,6 +41,14 @@ object Engine {
         }
     }
 
+    /** Mengekstrak daftar media/galeri dalam format JSON string via gallery-dl. */
+    suspend fun extractGallery(url: String): String = withContext(Dispatchers.IO) {
+        awaitReady()
+        val py = Python.getInstance()
+        val module = py.getModule("grabber")
+        module.callAttr("extract_info", url).toString()
+    }
+
     /** Menjalankan gallery-dl via Chaquopy untuk mengunduh gambar/galeri. */
     suspend fun downloadGallery(url: String, outputDir: String): Boolean = withContext(Dispatchers.IO) {
         awaitReady()
@@ -59,10 +67,6 @@ object Engine {
         }.getOrDefault("tidak diketahui")
     }
 
-    /**
-     * Perbarui yt-dlp lewat internet. Dipanggil lewat refleksi supaya tidak bergantung pada
-     * nama kelas saluran update yang bisa berubah antarversi library.
-     */
     suspend fun update(ctx: Context): String = withContext(Dispatchers.IO) {
         try {
             awaitReady()
@@ -96,7 +100,6 @@ object Engine {
             f.isAccessible = true
             return runCatching { f.get(null) }.getOrNull()
         }
-        // Kotlin companion: UpdateChannel.Companion.get_STABLE() / getSTABLE()
         val comp = type.declaredFields.firstOrNull { it.name == "Companion" }
         if (comp != null) {
             comp.isAccessible = true

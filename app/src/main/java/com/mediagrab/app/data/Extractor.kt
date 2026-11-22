@@ -4,9 +4,10 @@ import com.yausername.youtubedl_android.YoutubeDL
 import com.yausername.youtubedl_android.YoutubeDLRequest
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.json.JSONArray
 import org.json.JSONObject
 
-/** Membaca info link (judul, thumbnail, isi playlist/album) lewat yt-dlp. */
+/** Membaca info link (judul, thumbnail, isi playlist/album) lewat yt-dlp dan gallery-dl. */
 object Extractor {
 
     private val IMAGE_EXT = setOf("jpg", "jpeg", "png", "webp", "gif", "heic", "avif")
@@ -58,35 +59,79 @@ object Extractor {
 
     suspend fun parse(url: String): ParsedLink = withContext(Dispatchers.IO) {
         Engine.awaitReady()
-        val req = baseRequest(url).apply {
-            addOption("--dump-single-json")
-            addOption("--flat-playlist")
-        }
-        val resp = YoutubeDL.getInstance().execute(req)
-        val json = parseJson(resp.out)
-
-        val entriesJson = json.optJSONArray("entries")
-        val isPlaylist = json.str("_type") == "playlist" || entriesJson != null
-
-        if (isPlaylist) {
-            val list = ArrayList<MediaEntry>()
-            if (entriesJson != null) {
-                for (i in 0 until entriesJson.length()) {
-                    val e = entriesJson.optJSONObject(i) ?: continue
-                    entryOf(e, url, i)?.let { list += it }
-                }
+        // 1. Coba ekstraksi menggunakan yt-dlp terlebih dahulu
+        val ytdlpResult = runCatching {
+            val req = baseRequest(url).apply {
+                addOption("--dump-single-json")
+                addOption("--flat-playlist")
             }
-            if (list.isEmpty()) throw IllegalStateException("Playlist/album kosong atau tidak bisa diakses")
-            ParsedLink(url, json.str("title") ?: "Playlist", true, list)
-        } else {
-            val e = entryOf(json, url, 0) ?: throw IllegalStateException("Link tidak dikenali")
-            ParsedLink(url, e.title, false, listOf(e))
+            val resp = YoutubeDL.getInstance().execute(req)
+            val json = parseJson(resp.out)
+
+            val entriesJson = json.optJSONArray("entries")
+            val isPlaylist = json.str("_type") == "playlist" || entriesJson != null
+
+            if (isPlaylist) {
+                val list = ArrayList<MediaEntry>()
+                if (entriesJson != null) {
+                    for (i in 0 until entriesJson.length()) {
+                        val e = entriesJson.optJSONObject(i) ?: continue
+                        entryOf(e, url, i)?.let { list += it }
+                    }
+                }
+                if (list.isEmpty()) throw IllegalStateException("Playlist/album kosong atau tidak bisa diakses")
+                ParsedLink(url, json.str("title") ?: "Playlist", true, list)
+            } else {
+                val e = entryOf(json, url, 0) ?: throw IllegalStateException("Link tidak dikenali")
+                ParsedLink(url, e.title, false, listOf(e))
+            }
+        }
+
+        if (ytdlpResult.isSuccess) {
+            return@withContext ytdlpResult.getOrThrow()
+        }
+
+        // 2. Fallback ke gallery-dl jika yt-dlp gagal (misalnya link galeri/foto)
+        val galleryResult = runCatching {
+            val rawJson = Engine.extractGallery(url)
+            val arr = JSONArray(rawJson)
+            if (arr.length() == 0) {
+                throw IllegalStateException("Tidak ada gambar ditemukan (situs belum didukung atau butuh login)")
+            }
+            val list = ArrayList<MediaEntry>()
+            for (i in 0 until arr.length()) {
+                val o = arr.optJSONObject(i) ?: continue
+                val mediaUrl = o.str("url") ?: continue
+                val ext = o.str("ext")?.lowercase() ?: "jpg"
+                val title = o.str("title")?.take(80) ?: "Gambar ${i + 1}"
+                list += MediaEntry(
+                    id = o.str("id") ?: "img_$i",
+                    title = title,
+                    url = mediaUrl,
+                    thumbnail = if (ext in IMAGE_EXT) mediaUrl else null,
+                    durationSec = null,
+                    uploader = o.str("uploader"),
+                    isLive = false,
+                    isImage = ext in IMAGE_EXT
+                )
+            }
+            if (list.isEmpty()) throw IllegalStateException("Galeri kosong")
+            val albumTitle = list.first().title.ifBlank { "Galeri (${list.size} item)" }
+            ParsedLink(url, albumTitle, list.size > 1, list)
+        }
+
+        galleryResult.getOrElse {
+            // Jika keduanya gagal, lempar error yang paling relevan
+            throw ytdlpResult.exceptionOrNull() ?: it
         }
     }
 
     /** Cari alamat stream langsung untuk preview (sebelum diunduh). */
     suspend fun resolveStream(entry: MediaEntry, audioOnly: Boolean): StreamInfo =
         withContext(Dispatchers.IO) {
+            if (entry.isImage) {
+                return@withContext StreamInfo(entry.url, emptyMap(), false)
+            }
             Engine.awaitReady()
             val req = baseRequest(entry.url).apply {
                 addOption("--dump-single-json")
@@ -126,7 +171,7 @@ object Extractor {
                 "Konten ini butuh login atau tidak bisa diakses tanpa akun."
             clean.contains("private", true) -> "Konten ini privat."
             clean.contains("Unable to download", true) || clean.contains("resolve", true) || clean.contains("timed out", true) ->
-                "Gagal terhubung. Periksa koneksi internet."
+                "Gagal terhubung atau link butuh login / tidak didukung."
             else -> clean.take(200)
         }
     }
