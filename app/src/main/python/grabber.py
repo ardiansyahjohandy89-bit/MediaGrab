@@ -1,8 +1,11 @@
 import gallery_dl
 import json
 
-def extract_info(url):
+def extract_info(url, limit=30):
     results = []
+    class LimitReached(Exception):
+        pass
+
     class InfoJob(gallery_dl.job.DataJob):
         def handle_url(self, url, kwdict):
             results.append({
@@ -12,11 +15,16 @@ def extract_info(url):
                 "ext": str(kwdict.get("extension") or "jpg"),
                 "id": str(kwdict.get("id") or kwdict.get("post_id") or len(results))
             })
+            if len(results) >= limit:
+                raise LimitReached()
         def handle_directory(self, kwdict):
             pass
 
-    job = InfoJob(url)
-    job.run()
+    try:
+        job = InfoJob(url)
+        job.run()
+    except LimitReached:
+        pass
     return json.dumps(results)
 
 def download_gallery(url, output_dir):

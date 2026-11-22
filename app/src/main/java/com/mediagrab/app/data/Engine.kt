@@ -7,25 +7,34 @@ import com.yausername.ffmpeg.FFmpeg
 import com.yausername.youtubedl_android.YoutubeDL
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-/** Inisialisasi dan pemeliharaan engine yt-dlp + ffmpeg + gallery-dl (Chaquopy). */
+/** Inisialisasi paralel yt-dlp + ffmpeg + gallery-dl (Chaquopy). */
 object Engine {
     private val ready = MutableStateFlow(false)
+    private val pythonReady = MutableStateFlow(false)
     private val failure = MutableStateFlow<String?>(null)
 
     fun initAsync(ctx: Context) {
         val app = ctx.applicationContext
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                YoutubeDL.getInstance().init(app)
-                FFmpeg.getInstance().init(app)
-                if (!Python.isStarted()) {
-                    Python.start(AndroidPlatform(app))
+                val pyJob = async {
+                    if (!Python.isStarted()) {
+                        Python.start(AndroidPlatform(app))
+                    }
+                    pythonReady.value = true
                 }
+                val ytdlJob = async {
+                    YoutubeDL.getInstance().init(app)
+                    FFmpeg.getInstance().init(app)
+                }
+                awaitAll(pyJob, ytdlJob)
                 ready.value = true
             } catch (e: Throwable) {
                 failure.value = e.message ?: e.javaClass.simpleName
@@ -33,25 +42,29 @@ object Engine {
         }
     }
 
-    /** Tunggu engine siap (inisialisasi pertama butuh beberapa detik). */
-    suspend fun awaitReady() {
-        while (!ready.value) {
-            failure.value?.let { throw IllegalStateException("Engine gagal dimulai: $it") }
-            delay(150)
+    suspend fun awaitPythonReady() {
+        while (!pythonReady.value && !ready.value) {
+            failure.value?.let { throw IllegalStateException("Python gagal dimulai: $it") }
+            delay(100)
         }
     }
 
-    /** Mengekstrak daftar media/galeri dalam format JSON string via gallery-dl. */
-    suspend fun extractGallery(url: String): String = withContext(Dispatchers.IO) {
-        awaitReady()
-        val py = Python.getInstance()
-        val module = py.getModule("grabber")
-        module.callAttr("extract_info", url).toString()
+    suspend fun awaitReady() {
+        while (!ready.value) {
+            failure.value?.let { throw IllegalStateException("Engine gagal dimulai: $it") }
+            delay(100)
+        }
     }
 
-    /** Menjalankan gallery-dl via Chaquopy untuk mengunduh gambar/galeri. */
+    suspend fun extractGallery(url: String): String = withContext(Dispatchers.IO) {
+        awaitPythonReady()
+        val py = Python.getInstance()
+        val module = py.getModule("grabber")
+        module.callAttr("extract_info", url, 30).toString()
+    }
+
     suspend fun downloadGallery(url: String, outputDir: String): Boolean = withContext(Dispatchers.IO) {
-        awaitReady()
+        awaitPythonReady()
         val py = Python.getInstance()
         val module = py.getModule("grabber")
         val status = module.callAttr("download_gallery", url, outputDir).toInt()
